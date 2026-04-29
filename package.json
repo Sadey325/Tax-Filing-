@@ -7,11 +7,11 @@
     "build": "next build",
     "start": "next start"
   },
-  "dependencies": {
-    "next": "latest",
-    "react": "latest",
-    "react-dom": "latest",
-    "openai": "latest"
-  },
+ "dependencies": {
+  "@google/genai": "latest",
+  "next": "latest",
+  "react": "latest",
+  "react-dom": "latest"
+},
   "devDependencies": {}
 }
