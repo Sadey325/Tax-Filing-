@@ -358,7 +358,7 @@ export default function Home() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Bill scan failed.");
+        throw new Error(data.details || data.error || "Bill scan failed.");
       }
 
       setInputClaimDraft((prev) => ({
