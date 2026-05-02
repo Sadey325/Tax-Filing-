@@ -608,7 +608,7 @@ export default function Home() {
                     <div className="small">Use mobile camera or upload an invoice image.</div>
                   </label>
                   <button className="btn" style={{ width: "100%", marginTop: 14 }} onClick={scanBillWithChatGPT} disabled={!billFile || isScanningBill}>
-                    {isScanningBill ? "Scanning..." : "🤖 Scan bill with ChatGPT"}
+                    {isScanningBill ? "Scanning..." : "🤖 Scan bill with AI "}
                   </button>
                   {billPreviewUrl && <img className="preview" src={billPreviewUrl} alt="Uploaded bill preview" />}
                 </div>
