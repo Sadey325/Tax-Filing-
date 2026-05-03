@@ -924,6 +924,19 @@ export default function Home() {
     ))}
   </div>
 )}
+                <div className="alert warn">
+  The OCR result must be reviewed before filing. Bills vary in
+  layout and OCR can make mistakes.
+</div>
+
+{/* 🔥 Confidence goes here */}
+{inputClaimDraft.confidence && (
+  <div className="small" style={{ marginBottom: 12 }}>
+    Confidence: {inputClaimDraft.confidence === "high" ? "🟢 High" :
+                 inputClaimDraft.confidence === "medium" ? "🟡 Medium" :
+                 "🔴 Low"}
+  </div>
+)}
 
                 <div className="grid two">
                   <div>
