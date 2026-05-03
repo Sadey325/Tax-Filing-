@@ -29,7 +29,7 @@ const GST_RATES = {
   tourism: 0.17,
 };
 
-const emptyInputClaim = {
+validationWarnings: [],
   supplierTin: "",
   supplierName: "",
   invoiceNumber: "",
@@ -471,6 +471,7 @@ export default function Home() {
         revenueCapital: data.revenueCapital || prev.revenueCapital,
         confidence: data.confidence || "",
         notes: data.notes || "",
+        validationWarnings: data.validationWarnings || [],
       }));
 
       setNotice(
@@ -915,9 +916,9 @@ export default function Home() {
                 </div>
 
                 {/* 🔥 ADD HERE */}
-                {claim?.validationWarnings?.length > 0 && (
-               <div className="alert warning">
-          {claim.validationWarnings.map((w, i) => (
+              {inputClaimDraft.validationWarnings?.length > 0 && (
+  <div className="alert warning">
+    {inputClaimDraft.validationWarnings.map((w, i) => (
       <div key={i}>⚠️ {w}</div>
     ))}
   </div>
