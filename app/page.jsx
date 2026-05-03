@@ -180,6 +180,10 @@ function StatCard({ label, value, helper }) {
   );
 }
 
+function Spinner() {
+  return <span className="spinner" aria-hidden="true" />;
+}
+
 export default function Home() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [error, setError] = useState("");
@@ -470,7 +474,7 @@ export default function Home() {
       }));
 
       setNotice(
-        `Bill scanned. Confidence: ${
+        `Invoice data extracted successfully. Confidence: ${
           data.confidence || "unknown"
         }. Please verify before saving.`
       );
@@ -931,7 +935,14 @@ export default function Home() {
                       onClick={scanBillWithAI}
                       disabled={!billFile || isScanningBill}
                     >
-                      {isScanningBill ? "Scanning..." : "Scan bill with AI"}
+                      {isScanningBill ? (
+                        <>
+                          <Spinner />
+                          Scanning bill...
+                        </>
+                      ) : (
+                        "Scan bill with AI"
+                      )}
                     </button>
 
                     {billPreviewUrl && (
