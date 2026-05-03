@@ -948,6 +948,11 @@ export default function Home() {
                         "Scan bill with AI"
                       )}
                     </button>
+                    {isScanningBill && (
+                    <div className="small" style={{ marginTop: 8 }}>
+                    Processing image with AI...
+                    </div>
+                    )}
 
                     {billPreviewUrl && (
                       <img
