@@ -74,22 +74,8 @@ function autoDetectGst(parsed) {
   const rate = Number(parsed.detectedGstRate || 0);
 
   if (gst > 0) {
-  const detected = [6, 8, 12, 16].includes(rate) ? rate : 8;
-  return {
-    ...parsed,
-    ...pickGstBucket(detected, gst),
-  };
-}
-
-  if ([6, 8, 12, 16].includes(rate) && gst > 0) {
-    return { ...parsed, ...pickGstBucket(rate, gst) };
-  }
-
-  if (ex > 0 && gst > 0) {
-    const r = Math.round((gst / ex) * 100);
-    if ([6, 8, 12, 16].includes(r)) {
-      return { ...parsed, ...pickGstBucket(r, gst) };
-    }
+    const detected = [6, 8, 12, 16].includes(rate) ? rate : 8;
+    return { ...parsed, ...pickGstBucket(detected, gst) };
   }
 
   if (inc > 0 && ex > 0) {
@@ -105,7 +91,6 @@ function autoDetectGst(parsed) {
 
 function validateClaim(claim) {
   const warnings = [];
-
   const total = moneyToNumber(claim.invoiceTotalExcludingGst);
 
   const gstValues = [
@@ -118,18 +103,7 @@ function validateClaim(claim) {
   const filled = gstValues.filter(x => x.value > 0);
 
   if (total > 0 && filled.length === 0) {
-    warnings.push("⚠️ No GST detected. Please verify invoice.");
-  }
-
-  for (const g of filled) {
-    const expected = Number((total * (g.rate / 100)).toFixed(2));
-    if (Math.abs(expected - g.value) > 0.05) {
-      warnings.push(`⚠️ GST ${g.rate}% mismatch`);
-    }
-  }
-
-  if (filled.length > 1) {
-    warnings.push("⚠️ Multiple GST rates detected");
+    warnings.push("No GST detected. Please verify invoice.");
   }
 
   return warnings;
@@ -139,13 +113,14 @@ function normalizeClaim(parsed) {
   const auto = autoDetectGst(parsed || {});
   const claim = { ...emptyClaim(), ...parsed, ...auto };
 
+  // ⭐ SMART subtotal detection
   const summarySubtotal = normalizeMoney(
     claim.summarySubtotal ||
-      claim.subTotal ||
-      claim.subtotal ||
-      claim.taxableTotal ||
-      claim.totalExcludingGst ||
-      claim.netTotal
+    claim.subTotal ||
+    claim.subtotal ||
+    claim.taxableTotal ||
+    claim.totalExcludingGst ||
+    claim.netTotal
   );
 
   const normalized = {
@@ -153,20 +128,23 @@ function normalizeClaim(parsed) {
     supplierName: safeString(claim.supplierName),
     invoiceNumber: safeString(claim.invoiceNumber),
     invoiceDate: normalizeDate(claim.invoiceDate),
+
+    // ⭐ MAIN FIX HERE
     invoiceTotalExcludingGst: normalizeMoney(
       summarySubtotal || claim.invoiceTotalExcludingGst
     ),
+
     gst6: normalizeMoney(claim.gst6),
     gst8: normalizeMoney(claim.gst8),
     gst12: normalizeMoney(claim.gst12),
     gst16: normalizeMoney(claim.gst16),
+
     revenueCapital: claim.revenueCapital || "Revenue",
     confidence: claim.confidence || "low",
     notes: safeString(claim.notes),
   };
 
   const excluding = moneyToNumber(normalized.invoiceTotalExcludingGst);
-
   const gstTotal =
     moneyToNumber(normalized.gst6) +
     moneyToNumber(normalized.gst8) +
@@ -175,6 +153,7 @@ function normalizeClaim(parsed) {
 
   const including = moneyToNumber(claim.invoiceTotalIncludingGst);
 
+  // fallback if AI fails
   if ((!excluding || excluding === 1000) && including > 0 && gstTotal > 0) {
     normalized.invoiceTotalExcludingGst = normalizeMoney(including - gstTotal);
   }
@@ -183,6 +162,19 @@ function normalizeClaim(parsed) {
 
   return { ...normalized, validationWarnings };
 }
+
+function cleanJson(text) {
+  let raw = text || "";
+  raw = raw.replace(/```json/g, "").replace(/```/g, "").trim();
+
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+
+  if (start >= 0 && end > start) {
+    raw = raw.slice(start, end + 1);
+  }
+
+  return raw;
 }
 
 export async function POST(request) {
@@ -206,68 +198,35 @@ export async function POST(request) {
           },
         },
         {
-text: `
-Extract this Maldives GST invoice into raw JSON only.
+          text: `
+Extract invoice data into JSON.
 
-Do not use markdown.
-Do not wrap the response in json blocks.
+IMPORTANT:
+Find subtotal using labels:
+Sub Total, Subtotal, Taxable Total, Total excluding GST, Net Total
 
-VERY IMPORTANT:
-For invoiceTotalExcludingGst, read the printed invoice summary value labelled:
-- "Sub Total"
-- "Subtotal"
-- "Taxable Total"
-- "Total excluding GST"
-- "Amount before GST"
-- "Net Total"
+Do NOT calculate from item rows.
 
-Do NOT use:
-- item rate
-- item amount
-- quantity
-- GST amount
-- random base estimate like 1000.00
-
-If the invoice has a summary section with "Sub Total", "GST", and "Total":
-- invoiceTotalExcludingGst = printed Sub Total
-- gstAmount = printed GST
-- invoiceTotalIncludingGst = printed Total
-
-If Sub Total is not readable, calculate:
-invoiceTotalExcludingGst = invoiceTotalIncludingGst - gstAmount
-
-For mixed invoices where some items have 0% GST and some have 8% GST:
-- Do not calculate GST from the full subtotal
-- Use the printed GST summary total
-
-Fields:
+Return:
 supplierTin, supplierName, invoiceNumber, invoiceDate,
 invoiceTotalExcludingGst, invoiceTotalIncludingGst,
 gstAmount, detectedGstRate,
+summarySubtotal, subTotal, subtotal, taxableTotal, totalExcludingGst, netTotal,
 gst6, gst8, gst12, gst16,
-revenueCapital, confidence, notes.
-
-For Maldives current GST invoices, if summary GST total is present and rate is 8%, put the full summary GST amount into gst8.
-
-Use YYYY-MM-DD for date.
-Use 2 decimal places for money.
+confidence, notes
 `,
         },
       ],
     });
 
-   let rawText = response.text || "";
+    const parsed = JSON.parse(cleanJson(response.text));
 
-rawText = rawText
-  .replace(/```json/g, "")
-  .replace(/```/g, "")
-  .trim();
-
-const parsed = JSON.parse(rawText);
-
-return Response.json(normalizeClaim(parsed));
+    return Response.json(normalizeClaim(parsed));
 
   } catch (error) {
-    return Response.json({ error: "OCR failed", details: error.message }, { status: 500 });
+    return Response.json(
+      { error: "OCR failed", details: error.message },
+      { status: 500 }
+    );
   }
 }
