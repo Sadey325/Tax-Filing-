@@ -454,7 +454,13 @@ export default function Home() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.details || data.error || "Bill scan failed.");
+        const message = data.details || data.error || "Bill scan failed.";
+
+        if (message.includes("429") || message.includes("Quota exceeded")) {
+        throw new Error("AI scan limit reached. Please wait a minute and try again, or upgrade your Gemini API plan.");
+        }
+
+        throw new Error(message);
       }
 
       setInputClaimDraft((prev) => ({
