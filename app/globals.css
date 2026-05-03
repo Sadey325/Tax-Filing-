@@ -444,8 +444,4 @@ th {
   to {
     transform: rotate(360deg);
   }
-.alert.warning {
-  background: #fff7ed;
-  color: #9a3412;
-  border: 1px solid #fed7aa;
 }
