@@ -181,8 +181,16 @@ export async function POST(request) {
       ],
     });
 
-    const parsed = JSON.parse(response.text);
-    return Response.json(normalizeClaim(parsed));
+   let rawText = response.text || "";
+
+rawText = rawText
+  .replace(/```json/g, "")
+  .replace(/```/g, "")
+  .trim();
+
+const parsed = JSON.parse(rawText);
+
+return Response.json(normalizeClaim(parsed));
 
   } catch (error) {
     return Response.json({ error: "OCR failed", details: error.message }, { status: 500 });
