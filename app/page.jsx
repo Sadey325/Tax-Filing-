@@ -666,7 +666,11 @@ export default function Home() {
 
         <main className="content">
           {error && <div className="alert error">{error}</div>}
-          {notice && <div className="alert">{notice}</div>}
+          {notice && (
+  <div className={`alert ${notice.type === "success" ? "success" : ""}`}>
+    {typeof notice === "string" ? notice : notice.message}
+  </div>
+)}
 
           {activeTab === "dashboard" && (
             <section className="grid two">
