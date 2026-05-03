@@ -153,7 +153,18 @@ function normalizeClaim(parsed) {
     confidence: claim.confidence || "low",
     notes: safeString(claim.notes),
   };
+const excluding = moneyToNumber(normalized.invoiceTotalExcludingGst);
+const gstTotal =
+  moneyToNumber(normalized.gst6) +
+  moneyToNumber(normalized.gst8) +
+  moneyToNumber(normalized.gst12) +
+  moneyToNumber(normalized.gst16);
 
+const including = moneyToNumber(claim.invoiceTotalIncludingGst);
+
+if ((!excluding || excluding === 1000) && including > 0 && gstTotal > 0) {
+  normalized.invoiceTotalExcludingGst = normalizeMoney(including - gstTotal);
+}
   const validationWarnings = validateClaim(normalized);
 
   return { ...normalized, validationWarnings };
