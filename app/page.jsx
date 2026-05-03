@@ -506,6 +506,8 @@ export default function Home() {
     setIsScanningBill(false);
   }
 }
+
+  function updateInputClaimDraft(field, value) {
     setInputClaimDraft((prev) => ({ ...prev, [field]: value }));
   }
 
@@ -687,10 +689,10 @@ export default function Home() {
         <main className="content">
           {error && <div className="alert error">{error}</div>}
           {notice && (
-  <div className={`alert ${notice.type === "success" ? "success" : ""}`}>
-    {typeof notice === "string" ? notice : notice.message}
-  </div>
-)}
+            <div className={`alert ${notice.type === "success" ? "success" : ""}`}>
+              {typeof notice === "string" ? notice : notice.message}
+            </div>
+          )}
 
           {activeTab === "dashboard" && (
             <section className="grid two">
@@ -940,6 +942,14 @@ export default function Home() {
     Confidence: {inputClaimDraft.confidence === "high" ? "🟢 High" :
                  inputClaimDraft.confidence === "medium" ? "🟡 Medium" :
                  "🔴 Low"}
+  </div>
+)}
+
+{inputClaimDraft.validationWarnings?.length > 0 && (
+  <div className="alert warning">
+    {inputClaimDraft.validationWarnings.map((warning, index) => (
+      <div key={index}>{warning}</div>
+    ))}
   </div>
 )}
 
@@ -1276,9 +1286,9 @@ export default function Home() {
                 </div>
               </div>
             </section>
+          )}
         </main>
       </section>
     </div>
   );
 }
-
