@@ -899,13 +899,7 @@ export default function Home() {
               </div>
             </section>
           )}
-          {claim?.validationWarnings?.length > 0 && (
-  <div className="alert warning">
-    {claim.validationWarnings.map((w, i) => (
-      <div key={i}>⚠️ {w}</div>
-    ))}
-  </div>
-)}
+    
           {activeTab === "inputClaims" && (
             <section className="grid" style={{ gap: 20 }}>
               <div className="card">
