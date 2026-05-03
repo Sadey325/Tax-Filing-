@@ -108,410 +108,52 @@ function saveJson(key, value) {
 
 function Field({ label, value, onChange, placeholder, type = "text" }) {
   return (
-    <label>
-      <span>{label}</span>
-      <input type={type} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />
-    </label>
-  );
-}
+    <div className="app-shell">
+      <aside className="sidebar">
+        <div className="brand">
+          <div className="brand-title">Maldives Tax Filer</div>
+          <div className="brand-subtitle">
+            Tax, payroll, and input claim automation for Maldives businesses.
+          </div>
+        </div>
 
-function SelectField({ label, value, onChange, children }) {
-  return (
-    <label>
-      <span>{label}</span>
-      <select value={value} onChange={(e) => onChange(e.target.value)}>{children}</select>
-    </label>
-  );
-}
+        <nav className="nav">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              className={`tab ${activeTab === tab.key ? "active" : ""}`}
+              onClick={() => setActiveTab(tab.key)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+      </aside>
 
-function ResultCard({ title, amountCents, breakdown = [] }) {
-  return (
-    <div className="result">
-      <div className="small">CALCULATED RESULT</div>
-      <div className="amount">MVR {formatMvr(amountCents)}</div>
-      <div className="small">{title}</div>
-      {breakdown.length > 0 && (
-        <div className="breakdown">
-          <strong>Breakdown</strong>
-          {breakdown.map((item) => (
-            <div className="row" key={item.label}>
-              <span>{item.label}</span>
-              <span className="money">MVR {formatMvr(item.valueCents)}</span>
+      <section className="main">
+        <div className="topbar">
+          <div>
+            <div className="page-title">{activeTabLabel}</div>
+            <div className="page-subtitle">
+              Manage tax calculations, payroll estimates, and input claims.
             </div>
+          </div>
+          <div className="badge">Fullstack v1.0</div>
+        </div>
+
+        <div className="mobile-nav">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              className={`tab ${activeTab === tab.key ? "active" : ""}`}
+              onClick={() => setActiveTab(tab.key)}
+            >
+              {tab.label}
+            </button>
           ))}
         </div>
-      )}
-    </div>
-  );
-}
 
-const tabs = [
-  { key: "dashboard", label: "Dashboard", icon: "📊" },
-  { key: "gst", label: "GST", icon: "🧾" },
-  { key: "income", label: "Income Tax", icon: "💼" },
-  { key: "ewt", label: "EWT", icon: "👥" },
-  { key: "inputClaims", label: "Input Claims", icon: "📷" },
-  { key: "history", label: "History", icon: "🕘" },
-  { key: "profile", label: "Profile", icon: "👤" },
-];
-
-export default function Home() {
-  const [activeTab, setActiveTab] = useState("dashboard");
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
-
-  const [profile, setProfile] = useState({
-    name: "",
-    email: "",
-    tin: "",
-    phone: "",
-    business: "",
-    gstStatus: "no",
-  });
-
-  const [history, setHistory] = useState([]);
-  const [gst, setGst] = useState({ sector: "general", totalSales: "", exemptSales: "", inputTax: "", nilReturn: false });
-  const [gstResult, setGstResult] = useState(null);
-
-  const [income, setIncome] = useState({ type: "individual", amount: "", businessExpenses: "", deductions: "", residentStatus: "resident" });
-  const [incomeResult, setIncomeResult] = useState(null);
-
-  const [ewt, setEwt] = useState({ employeeName: "", salary: "", allowances: "", benefits: "", contribution: "" });
-  const [ewtResult, setEwtResult] = useState(null);
-
-  const [inputClaimDraft, setInputClaimDraft] = useState(emptyInputClaim);
-  const [inputClaimRows, setInputClaimRows] = useState([]);
-  const [billPreviewUrl, setBillPreviewUrl] = useState("");
-  const [billFile, setBillFile] = useState(null);
-  const [isScanningBill, setIsScanningBill] = useState(false);
-
-  useEffect(() => {
-    setProfile(loadJson(STORAGE_KEYS.profile, profile));
-    setHistory(loadJson(STORAGE_KEYS.history, []));
-    setInputClaimRows(loadJson(STORAGE_KEYS.inputClaims, []));
-  }, []);
-
-  useEffect(() => saveJson(STORAGE_KEYS.history, history), [history]);
-  useEffect(() => saveJson(STORAGE_KEYS.inputClaims, inputClaimRows), [inputClaimRows]);
-
-  const totals = useMemo(() => {
-    return history.reduce((acc, item) => {
-      acc.total += item.amountCents || 0;
-      acc[item.type] = (acc[item.type] || 0) + (item.amountCents || 0);
-      return acc;
-    }, { total: 0 });
-  }, [history]);
-
-  function runSafely(action) {
-    try {
-      setError("");
-      setNotice("");
-      action();
-    } catch (err) {
-      setError(err.message || "Something went wrong.");
-    }
-  }
-
-  function addHistory(record) {
-    setHistory((prev) => [{ id: crypto.randomUUID(), createdAt: new Date().toISOString(), ...record }, ...prev].slice(0, 200));
-  }
-
-  function calculateGST() {
-    runSafely(() => {
-      if (gst.nilReturn) {
-        const result = { title: "Nil Return - No tax due", amountCents: 0, breakdown: [] };
-        setGstResult(result);
-        addHistory({ type: "GST", ...result, inputs: gst });
-        return;
-      }
-
-      const totalSales = parseMoneyToCents(gst.totalSales);
-      const exemptSales = parseMoneyToCents(gst.exemptSales);
-      const inputTax = parseMoneyToCents(gst.inputTax);
-
-      validateNonNegativeCents("Total sales", totalSales);
-      validateNonNegativeCents("Exempt sales", exemptSales);
-      validateNonNegativeCents("Input tax", inputTax);
-
-      if (exemptSales > totalSales) throw new Error("Exempt sales cannot be greater than total sales.");
-
-      const taxableSales = totalSales - exemptSales;
-      const gstRate = GST_RATES[gst.sector];
-      const outputTax = percentOfCents(taxableSales, gstRate);
-      const netGst = outputTax - inputTax;
-
-      const result = {
-        title: netGst < 0 ? "GST Refund Due" : "Net GST Payable",
-        amountCents: Math.abs(netGst),
-        breakdown: [
-          { label: "Total Sales", valueCents: totalSales },
-          { label: "Exempt Sales", valueCents: exemptSales },
-          { label: "Taxable Sales", valueCents: taxableSales },
-          { label: `Output Tax (${(gstRate * 100).toFixed(0)}%)`, valueCents: outputTax },
-          { label: "Input Tax Claimed", valueCents: inputTax },
-        ],
-      };
-
-      setGstResult(result);
-      addHistory({ type: "GST", ...result, inputs: gst });
-    });
-  }
-
-  function calculateIncomeTax() {
-    runSafely(() => {
-      const grossIncome = parseMoneyToCents(income.amount);
-      const businessExpenses = income.type === "business" ? parseMoneyToCents(income.businessExpenses) : 0;
-      const deductions = parseMoneyToCents(income.deductions);
-
-      validateNonNegativeCents("Annual income", grossIncome);
-      validateNonNegativeCents("Business expenses", businessExpenses);
-      validateNonNegativeCents("Deductions", deductions);
-
-      const taxableIncome = Math.max(0, grossIncome - businessExpenses - deductions);
-      const taxPayable = calculateProgressiveTaxCents(taxableIncome, INCOME_TAX_BRACKETS);
-      const effectiveRate = taxableIncome === 0 ? 0 : (taxPayable / taxableIncome) * 100;
-
-      const result = {
-        title: `Income Tax (Effective: ${effectiveRate.toFixed(2)}%)`,
-        amountCents: taxPayable,
-        breakdown: [
-          { label: "Gross Income", valueCents: grossIncome },
-          { label: "Business Expenses", valueCents: businessExpenses },
-          { label: "Other Deductions", valueCents: deductions },
-          { label: "Taxable Income", valueCents: taxableIncome },
-        ],
-      };
-
-      setIncomeResult(result);
-      addHistory({ type: "Income Tax", ...result, inputs: income });
-    });
-  }
-
-  function calculateEWT() {
-    runSafely(() => {
-      const salary = parseMoneyToCents(ewt.salary);
-      const allowances = parseMoneyToCents(ewt.allowances);
-      const benefits = parseMoneyToCents(ewt.benefits);
-      const contribution = parseMoneyToCents(ewt.contribution);
-
-      validateNonNegativeCents("Salary", salary);
-      validateNonNegativeCents("Allowances", allowances);
-      validateNonNegativeCents("Benefits", benefits);
-      validateNonNegativeCents("Contribution", contribution);
-
-      const totalRemuneration = Math.max(0, salary + allowances + benefits - contribution);
-      const tax = calculateProgressiveTaxCents(totalRemuneration, EWT_MONTHLY_BRACKETS);
-      const netAfterTax = totalRemuneration - tax;
-      const employeeName = ewt.employeeName.trim() || "Employee";
-
-      const result = {
-        title: `EWT to Withhold (${employeeName})`,
-        amountCents: tax,
-        breakdown: [
-          { label: "Gross Salary", valueCents: salary },
-          { label: "Allowances", valueCents: allowances },
-          { label: "Benefits", valueCents: benefits },
-          { label: "Contribution", valueCents: contribution },
-          { label: "Total Remuneration", valueCents: totalRemuneration },
-          { label: "Net After Tax", valueCents: netAfterTax },
-        ],
-      };
-
-      setEwtResult(result);
-      addHistory({ type: "EWT", ...result, inputs: ewt });
-    });
-  }
-
-  function handleSaveProfile() {
-    saveJson(STORAGE_KEYS.profile, profile);
-    setNotice("Profile saved.");
-    setError("");
-  }
-
-  function handleBillImageUpload(file) {
-    if (!file) return;
-    setBillFile(file);
-    setBillPreviewUrl(URL.createObjectURL(file));
-    setError("");
-    setNotice("");
-  }
-
-  async function scanBillWithChatGPT() {
-    if (!billFile) {
-      setError("Upload or scan a bill first.");
-      return;
-    }
-
-    setIsScanningBill(true);
-    setError("");
-    setNotice("");
-
-    try {
-      const formData = new FormData();
-      formData.append("bill", billFile);
-
-      const response = await fetch("/api/extract-input-claim", {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.details || data.error || "Bill scan failed.");
-      }
-
-      setInputClaimDraft((prev) => ({
-        ...prev,
-        supplierTin: data.supplierTin || prev.supplierTin,
-        supplierName: data.supplierName || prev.supplierName,
-        invoiceNumber: data.invoiceNumber || prev.invoiceNumber,
-        invoiceDate: data.invoiceDate || prev.invoiceDate,
-        invoiceTotalExcludingGst: data.invoiceTotalExcludingGst || prev.invoiceTotalExcludingGst,
-        gst6: data.gst6 || prev.gst6,
-        gst8: data.gst8 || prev.gst8,
-        gst12: data.gst12 || prev.gst12,
-        gst16: data.gst16 || prev.gst16,
-        revenueCapital: data.revenueCapital || prev.revenueCapital,
-        confidence: data.confidence || "",
-        notes: data.notes || "",
-      }));
-
-      setNotice(`Bill scanned. Confidence: ${data.confidence || "unknown"}. Please verify before saving.`);
-    } catch (err) {
-      setError(err.message || "Could not scan the bill.");
-    } finally {
-      setIsScanningBill(false);
-    }
-  }
-
-  function updateInputClaimDraft(field, value) {
-    setInputClaimDraft((prev) => ({ ...prev, [field]: value }));
-  }
-
-  function addInputClaimRow() {
-    runSafely(() => {
-      const invoiceTotal = parseMoneyToCents(inputClaimDraft.invoiceTotalExcludingGst);
-      const gst6 = parseMoneyToCents(inputClaimDraft.gst6);
-      const gst8 = parseMoneyToCents(inputClaimDraft.gst8);
-      const gst12 = parseMoneyToCents(inputClaimDraft.gst12);
-      const gst16 = parseMoneyToCents(inputClaimDraft.gst16);
-
-      validateNonNegativeCents("Invoice total excluding GST", invoiceTotal);
-      validateNonNegativeCents("GST charged at 6%", gst6);
-      validateNonNegativeCents("GST charged at 8%", gst8);
-      validateNonNegativeCents("GST charged at 12%", gst12);
-      validateNonNegativeCents("GST charged at 16%", gst16);
-
-      if (!inputClaimDraft.supplierTin.trim()) throw new Error("Supplier TIN is required.");
-      if (!inputClaimDraft.supplierName.trim()) throw new Error("Supplier name is required.");
-      if (!inputClaimDraft.invoiceNumber.trim()) throw new Error("Supplier invoice number is required.");
-      if (!inputClaimDraft.invoiceDate) throw new Error("Invoice date is required.");
-      if (!inputClaimDraft.taxableActivityNumber.trim()) throw new Error("Your taxable activity number is required.");
-
-      const row = {
-        id: crypto.randomUUID(),
-        supplierTin: inputClaimDraft.supplierTin.trim(),
-        supplierName: inputClaimDraft.supplierName.trim(),
-        invoiceNumber: inputClaimDraft.invoiceNumber.trim(),
-        invoiceDate: inputClaimDraft.invoiceDate,
-        invoiceTotalExcludingGstCents: invoiceTotal,
-        gst6Cents: gst6,
-        gst8Cents: gst8,
-        gst12Cents: gst12,
-        gst16Cents: gst16,
-        taxableActivityNumber: inputClaimDraft.taxableActivityNumber.trim(),
-        revenueCapital: inputClaimDraft.revenueCapital,
-      };
-
-      setInputClaimRows((prev) => [...prev, row]);
-      setInputClaimDraft({ ...emptyInputClaim, taxableActivityNumber: row.taxableActivityNumber });
-      setNotice("Input claim row added.");
-    });
-  }
-
-  function exportInputClaimCsv() {
-    const headers = [
-      "#",
-      "Supplier TIN",
-      "Supplier Name",
-      "Supplier Invoice Number",
-      "Invoice Date",
-      "Invoice Total (excluding GST)",
-      "GST charged at 6%",
-      "GST charged at 8%",
-      "GST charged at 12%",
-      "GST charged at 16%",
-      "Your Taxable Activity Number",
-      "Revenue / Capital",
-    ];
-
-    const rows = inputClaimRows.map((row, index) => [
-      index + 1,
-      row.supplierTin,
-      row.supplierName,
-      row.invoiceNumber,
-      row.invoiceDate,
-      centsToMvr(row.invoiceTotalExcludingGstCents).toFixed(2),
-      centsToMvr(row.gst6Cents).toFixed(2),
-      centsToMvr(row.gst8Cents).toFixed(2),
-      centsToMvr(row.gst12Cents).toFixed(2),
-      centsToMvr(row.gst16Cents).toFixed(2),
-      row.taxableActivityNumber,
-      row.revenueCapital,
-    ]);
-
-    const csv = [headers, ...rows]
-      .map((line) => line.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(","))
-      .join("\n");
-
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `mira-input-tax-statement-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  function exportAllData() {
-    const data = {
-      exportedAt: new Date().toISOString(),
-      profile,
-      history,
-      inputClaimRows,
-    };
-
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `maldives-tax-filer-data-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  return (
-    <>
-      <header>
-        <div className="wrap header-row">
-          <div>
-            <h1>🇲🇻 Maldives Tax Filer</h1>
-            <div className="subtitle">GST, Income Tax, EWT and MIRA input claim OCR assistant</div>
-          </div>
-          <strong>Fullstack v1.0</strong>
-        </div>
-      </header>
-
-      <nav className="nav">
-        {tabs.map((tab) => (
-          <button key={tab.key} className={`tab ${activeTab === tab.key ? "active" : ""}`} onClick={() => setActiveTab(tab.key)}>
-            {tab.icon} {tab.label}
-          </button>
-        ))}
-      </nav>
-
-      <main className="wrap">
+        <main className="content">
         {error && <div className="alert error">{error}</div>}
         {notice && <div className="alert">{notice}</div>}
 
@@ -519,7 +161,7 @@ export default function Home() {
           <section className="grid two">
             <div className="card">
               <h2>Dashboard</h2>
-              <p className="small">This fullstack version includes frontend calculators, local storage, MIRA input claim rows, CSV export, and a backend OpenAI Vision OCR endpoint.</p>
+              <p className="small">This fullstack version includes frontend calculators, local storage, MIRA input claim rows, CSV export, and a backend Gemini AI OCR endpoint.</p>
               <div className="grid three" style={{ marginTop: 20 }}>
                 <div className="card"><strong>History</strong><div className="amount">{history.length}</div></div>
                 <div className="card"><strong>Total Calculated</strong><div className="amount">MVR {formatMvr(totals.total)}</div></div>
@@ -596,7 +238,7 @@ export default function Home() {
           <section className="grid" style={{ gap: 20 }}>
             <div className="card">
               <h2>MIRA Input Tax Claim Builder</h2>
-              <p className="small">Upload a bill, scan it with ChatGPT/OpenAI Vision, verify fields, then export CSV.</p>
+              <p className="small">Upload a bill, scan it with AI, verify fields, then export CSV.</p>
               <div className="alert warn">The OCR result must be reviewed by the user before filing. Bills vary in layout and OCR can make mistakes.</div>
 
               <div className="grid two">
@@ -608,7 +250,7 @@ export default function Home() {
                     <div className="small">Use mobile camera or upload an invoice image.</div>
                   </label>
                   <button className="btn" style={{ width: "100%", marginTop: 14 }} onClick={scanBillWithChatGPT} disabled={!billFile || isScanningBill}>
-                    {isScanningBill ? "Scanning..." : "🤖 Scan bill with AI "}
+                    {isScanningBill ? "Scanning..." : "Scan bill with AI"}
                   </button>
                   {billPreviewUrl && <img className="preview" src={billPreviewUrl} alt="Uploaded bill preview" />}
                 </div>
@@ -710,12 +352,14 @@ export default function Home() {
             </div>
             <div className="card">
               <h3>Backend included</h3>
-              <p className="small">The project includes <strong>app/api/extract-input-claim/route.js</strong>, which calls OpenAI Vision securely from the server using your <strong>OPENAI_API_KEY</strong>.</p>
-              <div className="alert warn">Never put your OpenAI API key in frontend React code.</div>
+              <p className="small">The project includes <strong>app/api/extract-input-claim/route.js</strong>, which calls Gemini securely from the server using your <strong>GEMINI_API_KEY</strong>.</p>
+              <div className="alert warn">Never put your Gemini API key in frontend React code.</div>
             </div>
           </section>
         )}
-      </main>
-    </>
+
+        </main>
+      </section>
+    </div>
   );
 }
