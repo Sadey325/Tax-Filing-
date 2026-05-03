@@ -303,6 +303,12 @@ select:focus {
   color: #065f46;
   border: 1px solid #a7f3d0;
 }
+.alert.warning {
+  background: #fff7ed;
+  color: #9a3412;
+  border: 1px solid #fed7aa;
+  margin-bottom: 16px;
+}
 .result {
   background: var(--surface);
   border: 1px solid var(--border);
