@@ -29,7 +29,7 @@ const GST_RATES = {
   tourism: 0.17,
 };
 
-validationWarnings: [],
+const emptyInputClaim = {
   supplierTin: "",
   supplierName: "",
   invoiceNumber: "",
@@ -43,6 +43,7 @@ validationWarnings: [],
   revenueCapital: "Revenue",
   confidence: "",
   notes: "",
+  validationWarnings: [],
 };
 
 const tabs = [
