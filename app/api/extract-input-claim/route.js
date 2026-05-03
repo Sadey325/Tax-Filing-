@@ -176,7 +176,23 @@ export async function POST(request) {
           },
         },
         {
-          text: "Extract invoice data with GST detection and return JSON",
+          text: `
+Extract this Maldives GST invoice into JSON only.
+
+Do not use markdown.
+Do not wrap the response in \`\`\`json.
+Return only a raw JSON object.
+
+Fields:
+supplierTin, supplierName, invoiceNumber, invoiceDate,
+invoiceTotalExcludingGst, invoiceTotalIncludingGst,
+gstAmount, detectedGstRate,
+gst6, gst8, gst12, gst16,
+revenueCapital, confidence, notes.
+
+Use YYYY-MM-DD for date.
+Use 2 decimal places for money.
+`,
         },
       ],
     });
