@@ -910,9 +910,18 @@ export default function Home() {
                 </p>
 
                 <div className="alert warn">
-                  The OCR result must be reviewed before filing. Bills vary in
-                  layout and OCR can make mistakes.
+                The OCR result must be reviewed before filing. Bills vary in
+                layout and OCR can make mistakes.
                 </div>
+
+                {/* 🔥 ADD HERE */}
+                {claim?.validationWarnings?.length > 0 && (
+               <div className="alert warning">
+          {claim.validationWarnings.map((w, i) => (
+      <div key={i}>⚠️ {w}</div>
+    ))}
+  </div>
+)}
 
                 <div className="grid two">
                   <div>
