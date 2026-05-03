@@ -73,9 +73,13 @@ function autoDetectGst(parsed) {
   const gst = moneyToNumber(parsed.gstAmount);
   const rate = Number(parsed.detectedGstRate || 0);
 
-  if (parsed.gst6 || parsed.gst8 || parsed.gst12 || parsed.gst16) {
-    return parsed;
-  }
+  if (gst > 0) {
+  const detected = [6, 8, 12, 16].includes(rate) ? rate : 8;
+  return {
+    ...parsed,
+    ...pickGstBucket(detected, gst),
+  };
+}
 
   if ([6, 8, 12, 16].includes(rate) && gst > 0) {
     return { ...parsed, ...pickGstBucket(rate, gst) };
