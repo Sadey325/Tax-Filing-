@@ -137,14 +137,25 @@ function validateClaim(claim) {
 
 function normalizeClaim(parsed) {
   const auto = autoDetectGst(parsed || {});
-  const claim = { ...emptyClaim(), ...auto };
+  const claim = { ...emptyClaim(), ...parsed, ...auto };
+
+  const summarySubtotal = normalizeMoney(
+    claim.summarySubtotal ||
+      claim.subTotal ||
+      claim.subtotal ||
+      claim.taxableTotal ||
+      claim.totalExcludingGst ||
+      claim.netTotal
+  );
 
   const normalized = {
     supplierTin: safeString(claim.supplierTin),
     supplierName: safeString(claim.supplierName),
     invoiceNumber: safeString(claim.invoiceNumber),
     invoiceDate: normalizeDate(claim.invoiceDate),
-    invoiceTotalExcludingGst: normalizeMoney(claim.invoiceTotalExcludingGst),
+    invoiceTotalExcludingGst: normalizeMoney(
+      summarySubtotal || claim.invoiceTotalExcludingGst
+    ),
     gst6: normalizeMoney(claim.gst6),
     gst8: normalizeMoney(claim.gst8),
     gst12: normalizeMoney(claim.gst12),
@@ -153,21 +164,25 @@ function normalizeClaim(parsed) {
     confidence: claim.confidence || "low",
     notes: safeString(claim.notes),
   };
-const excluding = moneyToNumber(normalized.invoiceTotalExcludingGst);
-const gstTotal =
-  moneyToNumber(normalized.gst6) +
-  moneyToNumber(normalized.gst8) +
-  moneyToNumber(normalized.gst12) +
-  moneyToNumber(normalized.gst16);
 
-const including = moneyToNumber(claim.invoiceTotalIncludingGst);
+  const excluding = moneyToNumber(normalized.invoiceTotalExcludingGst);
 
-if ((!excluding || excluding === 1000) && including > 0 && gstTotal > 0) {
-  normalized.invoiceTotalExcludingGst = normalizeMoney(including - gstTotal);
-}
+  const gstTotal =
+    moneyToNumber(normalized.gst6) +
+    moneyToNumber(normalized.gst8) +
+    moneyToNumber(normalized.gst12) +
+    moneyToNumber(normalized.gst16);
+
+  const including = moneyToNumber(claim.invoiceTotalIncludingGst);
+
+  if ((!excluding || excluding === 1000) && including > 0 && gstTotal > 0) {
+    normalized.invoiceTotalExcludingGst = normalizeMoney(including - gstTotal);
+  }
+
   const validationWarnings = validateClaim(normalized);
 
   return { ...normalized, validationWarnings };
+}
 }
 
 export async function POST(request) {
@@ -192,14 +207,38 @@ export async function POST(request) {
         },
         {
 text: `
-Extract this Maldives GST invoice into JSON only.
+Extract this Maldives GST invoice into raw JSON only.
 
-IMPORTANT:
-Use the invoice summary GST total, not the GST amount from a single line item.
-If the invoice has a summary section with "GST", "Sub Total", and "Total", use that GST value as gstAmount.
-For mixed invoices where some items have 0% GST and some have 8% GST, do not calculate GST from the full subtotal. Use the printed summary GST total.
+Do not use markdown.
+Do not wrap the response in json blocks.
 
-Return raw JSON only. Do not use markdown.
+VERY IMPORTANT:
+For invoiceTotalExcludingGst, read the printed invoice summary value labelled:
+- "Sub Total"
+- "Subtotal"
+- "Taxable Total"
+- "Total excluding GST"
+- "Amount before GST"
+- "Net Total"
+
+Do NOT use:
+- item rate
+- item amount
+- quantity
+- GST amount
+- random base estimate like 1000.00
+
+If the invoice has a summary section with "Sub Total", "GST", and "Total":
+- invoiceTotalExcludingGst = printed Sub Total
+- gstAmount = printed GST
+- invoiceTotalIncludingGst = printed Total
+
+If Sub Total is not readable, calculate:
+invoiceTotalExcludingGst = invoiceTotalIncludingGst - gstAmount
+
+For mixed invoices where some items have 0% GST and some have 8% GST:
+- Do not calculate GST from the full subtotal
+- Use the printed GST summary total
 
 Fields:
 supplierTin, supplierName, invoiceNumber, invoiceDate,
