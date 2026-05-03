@@ -433,80 +433,79 @@ export default function Home() {
   }
 
   async function scanBillWithAI() {
-    if (!billFile) {
-      setError("Upload or scan a bill first.");
-      return;
+  if (!billFile) {
+    setError("Upload or scan a bill first.");
+    return;
+  }
+
+  setIsScanningBill(true);
+  setError("");
+  setNotice("");
+
+  try {
+    const formData = new FormData();
+    formData.append("bill", billFile);
+
+    const response = await fetch("/api/extract-input-claim", {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      const message = data.details || data.error || "Bill scan failed.";
+
+      let waitTime = null;
+
+      try {
+        const retryMatch = JSON.stringify(data).match(/"retryDelay":"(\d+)s"/);
+        if (retryMatch) {
+          waitTime = parseInt(retryMatch[1], 10);
+        }
+      } catch (e) {}
+
+      if (message.includes("429") || message.includes("Quota exceeded")) {
+        throw new Error(
+          waitTime
+            ? `AI scan limit reached. Please wait ${waitTime} seconds and try again.`
+            : "AI scan limit reached. Please wait a moment and try again."
+        );
+      }
+
+      throw new Error(message);
     }
 
-    setIsScanningBill(true);
-    setError("");
-    setNotice("");
+    setInputClaimDraft((prev) => ({
+      ...prev,
+      supplierTin: data.supplierTin || prev.supplierTin,
+      supplierName: data.supplierName || prev.supplierName,
+      invoiceNumber: data.invoiceNumber || prev.invoiceNumber,
+      invoiceDate: data.invoiceDate || prev.invoiceDate,
+      invoiceTotalExcludingGst:
+        data.invoiceTotalExcludingGst || prev.invoiceTotalExcludingGst,
+      gst6: data.gst6 || prev.gst6,
+      gst8: data.gst8 || prev.gst8,
+      gst12: data.gst12 || prev.gst12,
+      gst16: data.gst16 || prev.gst16,
+      revenueCapital: data.revenueCapital || prev.revenueCapital,
+      confidence: data.confidence || "",
+      notes: data.notes || "",
+      validationWarnings: data.validationWarnings || [],
+    }));
 
-    try {
-      const formData = new FormData();
-      formData.append("bill", billFile);
-
-      const response = await fetch("/api/extract-input-claim", {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-       const message = data.details || data.error || "Bill scan failed.";
-
-// Try to extract retry delay (e.g., "36s")
-let waitTime = null;
-
-try {
-  const retryMatch = JSON.stringify(data).match(/"retryDelay":"(\d+)s"/);
-  if (retryMatch) {
-    waitTime = parseInt(retryMatch[1], 10);
+    setNotice({
+      type: "success",
+      message: `Invoice data extracted successfully. Confidence: ${
+        data.confidence || "unknown"
+      }. Please verify before saving.`,
+    });
+  } catch (err) {
+    setError(err.message || "Could not scan the bill.");
+  } finally {
+    setIsScanningBill(false);
   }
-} catch (e) {}
-
-if (message.includes("429") || message.includes("Quota exceeded")) {
-  throw new Error(
-    waitTime
-      ? `AI scan limit reached. Please wait ${waitTime} seconds and try again.`
-      : "AI scan limit reached. Please wait a moment and try again."
-  );
 }
-
-throw new Error(message);
-
-      setInputClaimDraft((prev) => ({
-        ...prev,
-        supplierTin: data.supplierTin || prev.supplierTin,
-        supplierName: data.supplierName || prev.supplierName,
-        invoiceNumber: data.invoiceNumber || prev.invoiceNumber,
-        invoiceDate: data.invoiceDate || prev.invoiceDate,
-        invoiceTotalExcludingGst:
-          data.invoiceTotalExcludingGst || prev.invoiceTotalExcludingGst,
-        gst6: data.gst6 || prev.gst6,
-        gst8: data.gst8 || prev.gst8,
-        gst12: data.gst12 || prev.gst12,
-        gst16: data.gst16 || prev.gst16,
-        revenueCapital: data.revenueCapital || prev.revenueCapital,
-        confidence: data.confidence || "",
-        notes: data.notes || "",
-        validationWarnings: data.validationWarnings || [],
-      }));
-
-      setNotice(
-        `Invoice data extracted successfully. Confidence: ${
-          data.confidence || "unknown"
-        }. Please verify before saving.`
-      );
-    } catch (err) {
-      setError(err.message || "Could not scan the bill.");
-    } finally {
-      setIsScanningBill(false);
-    }
-  }
-
-  function updateInputClaimDraft(field, value) {
     setInputClaimDraft((prev) => ({ ...prev, [field]: value }));
   }
 
