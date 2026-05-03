@@ -176,12 +176,15 @@ export async function POST(request) {
           },
         },
         {
-          text: `
+text: `
 Extract this Maldives GST invoice into JSON only.
 
-Do not use markdown.
-Do not wrap the response in \`\`\`json.
-Return only a raw JSON object.
+IMPORTANT:
+Use the invoice summary GST total, not the GST amount from a single line item.
+If the invoice has a summary section with "GST", "Sub Total", and "Total", use that GST value as gstAmount.
+For mixed invoices where some items have 0% GST and some have 8% GST, do not calculate GST from the full subtotal. Use the printed summary GST total.
+
+Return raw JSON only. Do not use markdown.
 
 Fields:
 supplierTin, supplierName, invoiceNumber, invoiceDate,
@@ -189,6 +192,8 @@ invoiceTotalExcludingGst, invoiceTotalIncludingGst,
 gstAmount, detectedGstRate,
 gst6, gst8, gst12, gst16,
 revenueCapital, confidence, notes.
+
+For Maldives current GST invoices, if summary GST total is present and rate is 8%, put the full summary GST amount into gst8.
 
 Use YYYY-MM-DD for date.
 Use 2 decimal places for money.
